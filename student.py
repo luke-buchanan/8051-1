@@ -457,7 +457,7 @@ class Student:
             y_hat = 0.5 * gbm_pred + 0.3 * rf_pred + 0.2 * ridge_pred
         
         # Handle Ridge with scaling
-        elif self.model_type == "ridge" and hasattr(self, 'scaler_'):
+        elif self.model_type in ["ridge", "linear"] and hasattr(self, 'scaler_'):
             F_scaled = self.scaler_.transform(F.values)
             y_hat = self.pipe_.predict(F_scaled)
         
