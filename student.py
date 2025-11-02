@@ -6,8 +6,6 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.dummy import DummyRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 
-
-
 import warnings
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
