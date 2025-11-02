@@ -142,6 +142,14 @@ class Student:
         # RSI
         feats[f"rsi_{self.rsi_window}"] = self._rsi(close, self.rsi_window)
 
+        # # MACD
+        # ema_12 = close.ewm(span=12, adjust=False).mean()
+        # ema_26 = close.ewm(span=26, adjust=False).mean()
+        # feats['macd_line'] = ema_12 - ema_26
+        # feats['macd_signal'] = feats['macd_line'].ewm(span=9, adjust=False).mean()
+        # feats['macd_hist'] = feats['macd_line'] - feats['macd_signal']
+
+
         F = pd.DataFrame(feats, index=X.index).replace([np.inf, -np.inf], np.nan)
         F = F.dropna()  # ensure all features present and causal
         return F

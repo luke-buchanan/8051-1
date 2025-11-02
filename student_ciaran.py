@@ -169,9 +169,10 @@ class Student:
         """
         Leakage-safe features with MACD added.
         """
-        close = self._close_series(X).astype(float)
-        lr = self._log_returns(close)
+
         df = X.copy()
+        close = self._close_series(df)
+        lr = self._log_returns(close)
 
         feats = {}
 
@@ -206,31 +207,8 @@ class Student:
         # feats['macd_signal'] = feats['macd_line'].ewm(span=9, adjust=False).mean()
         # feats['macd_hist'] = feats['macd_line'] - feats['macd_signal']
 
-                # lags r_{t-1},...,r_{t-n}
-        for i in range(1, self.n_lags + 1):
-            feats[f"lag{i}"] = lr.shift(i)
-
-        # momentum (mean of daily log-returns)
-        for w in self.mom_windows:
-            feats[f"mom_{w}"] = lr.rolling(w, min_periods=w).mean()
-
-        # volatility (std of daily log-returns)
-        wv = self.vol_window
-        feats[f"vol_{wv}"] = lr.rolling(wv, min_periods=wv).std(ddof=0)
-
-        # SMA/EMA distances: (price - MA) / MA
-        # for w in self.sma_windows:
-        #     sma = close.rolling(w, min_periods=w).mean()
-        #     feats[f"sma_dist_{w}"] = (close - sma) / sma.replace(0, np.nan)
-
-        for w in self.ema_windows:
-            ema = close.ewm(span=w, adjust=False, min_periods=w).mean()
-            feats[f"ema_dist_{w}"] = (close - ema) / ema.replace(0, np.nan)
-
-        # RSI
-        feats[f"rsi_{self.rsi_window}"] = self._rsi(close, self.rsi_window)
-
-        for w in self.sma_windows:
+        # rolling mean and std as features
+        for w in [self.h, self.h * 3, self.h * 5]:
             feats[f"roll_mean_{w}"] = lr.rolling(w, min_periods=w).mean()
             feats[f"roll_std_{w}"] = lr.rolling(w, min_periods=w).std(ddof=0)
 
@@ -239,10 +217,8 @@ class Student:
             feats[f"sma_dist_{w}"] = (close.shift(1) - sma) / sma.replace(0, np.nan)
 
         if isinstance(df.index, pd.DatetimeIndex):
-            feats['qtr'] = df.index.quarter
-            feats['mo'] = df.index.month
-
-
+            feats['quarter'] = df.index.quarter
+            feats['month'] = df.index.month
 
         F = pd.DataFrame(feats, index=X.index).replace([np.inf, -np.inf], np.nan)
         F = F.dropna()

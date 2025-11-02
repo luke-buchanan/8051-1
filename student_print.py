@@ -33,7 +33,7 @@ class Student:
         config=None,
         random_state: int = 42,
         *,
-        model_type="gbm",  # Options: "ridge", "gbm", "rf", "nn", "lgbm"
+        model_type="gbm",  # Options: "ridge", "gbm", "rf", "nn"
         
         # Feature knobs
         n_lags=20,
@@ -171,78 +171,35 @@ class Student:
         """
         close = self._close_series(X).astype(float)
         lr = self._log_returns(close)
-        df = X.copy()
 
         feats = {}
 
-        # # Lags
-        # for i in range(1, self.n_lags + 1):
-        #     feats[f"lag{i}"] = lr.shift(i)
-
-        # # Momentum
-        # for w in self.mom_windows:
-        #     feats[f"mom_{w}"] = lr.rolling(w, min_periods=w).mean()
-
-        # # Volatility
-        # wv = self.vol_window
-        # feats[f"vol_{wv}"] = lr.rolling(wv, min_periods=wv).std(ddof=0)
-
-        # # SMA/EMA distances
-        # for w in self.sma_windows:
-        #     sma = close.rolling(w, min_periods=w).mean()
-        #     feats[f"sma_dist_{w}"] = (close - sma) / sma.replace(0, np.nan)
-
-        # # for w in self.ema_windows:
-        # #     ema = close.ewm(span=w, adjust=False, min_periods=w).mean()
-        # #     feats[f"ema_dist_{w}"] = (close - ema) / ema.replace(0, np.nan)
-
-        # # RSI
-        # feats[f"rsi_{self.rsi_window}"] = self._rsi(close, self.rsi_window)
-
-        # # MACD
-        # ema_12 = close.ewm(span=12, adjust=False).mean()
-        # ema_26 = close.ewm(span=26, adjust=False).mean()
-        # feats['macd_line'] = ema_12 - ema_26
-        # feats['macd_signal'] = feats['macd_line'].ewm(span=9, adjust=False).mean()
-        # feats['macd_hist'] = feats['macd_line'] - feats['macd_signal']
-
-                # lags r_{t-1},...,r_{t-n}
+        # Lags
         for i in range(1, self.n_lags + 1):
             feats[f"lag{i}"] = lr.shift(i)
 
-        # momentum (mean of daily log-returns)
+        # Momentum
         for w in self.mom_windows:
             feats[f"mom_{w}"] = lr.rolling(w, min_periods=w).mean()
 
-        # volatility (std of daily log-returns)
+        # Volatility
         wv = self.vol_window
         feats[f"vol_{wv}"] = lr.rolling(wv, min_periods=wv).std(ddof=0)
 
-        # SMA/EMA distances: (price - MA) / MA
-        # for w in self.sma_windows:
-        #     sma = close.rolling(w, min_periods=w).mean()
-        #     feats[f"sma_dist_{w}"] = (close - sma) / sma.replace(0, np.nan)
-
-        for w in self.ema_windows:
-            ema = close.ewm(span=w, adjust=False, min_periods=w).mean()
-            feats[f"ema_dist_{w}"] = (close - ema) / ema.replace(0, np.nan)
+        # SMA/EMA distances
+        for w in self.sma_windows:
+            sma = close.rolling(w, min_periods=w).mean()
+            feats[f"sma_dist_{w}"] = (close - sma) / sma.replace(0, np.nan)
 
         # RSI
         feats[f"rsi_{self.rsi_window}"] = self._rsi(close, self.rsi_window)
 
-        for w in self.sma_windows:
-            feats[f"roll_mean_{w}"] = lr.rolling(w, min_periods=w).mean()
-            feats[f"roll_std_{w}"] = lr.rolling(w, min_periods=w).std(ddof=0)
-
-        for w in [20, 50]:
-            sma = close.shift(1).rolling(w).mean()
-            feats[f"sma_dist_{w}"] = (close.shift(1) - sma) / sma.replace(0, np.nan)
-
-        if isinstance(df.index, pd.DatetimeIndex):
-            feats['qtr'] = df.index.quarter
-            feats['mo'] = df.index.month
-
-
+        # MACD
+        ema_12 = close.ewm(span=12, adjust=False).mean()
+        ema_26 = close.ewm(span=26, adjust=False).mean()
+        feats['macd_line'] = ema_12 - ema_26
+        feats['macd_signal'] = feats['macd_line'].ewm(span=9, adjust=False).mean()
+        feats['macd_hist'] = feats['macd_line'] - feats['macd_signal']
 
         F = pd.DataFrame(feats, index=X.index).replace([np.inf, -np.inf], np.nan)
         F = F.dropna()
@@ -372,7 +329,61 @@ class Student:
             self.pipe_.fit(F.values, y.values)
 
         self.fitted_ = True
+        self._print_model_info()
         return self
+
+    def _print_model_info(self):
+        """Print model configuration after fitting."""
+        print("\n" + "="*60)
+        print("MODEL FITTED")
+        print("="*60)
+        
+        # Model type
+        print(f"Model: {self.model_type.upper()}")
+        
+        # Features
+        print(f"\nFeatures:")
+        print(f"  - Lags: {self.n_lags}")
+        print(f"  - Momentum windows: {self.mom_windows}")
+        print(f"  - Volatility window: {self.vol_window}")
+        print(f"  - SMA windows: {self.sma_windows}")
+        print(f"  - RSI window: {self.rsi_window}")
+        print(f"  - MACD: Yes (12/26/9)")
+        
+        # Model-specific hyperparameters
+        print(f"\nHyperparameters:")
+        if self.model_type == "gbm":
+            print(f"  - n_estimators: {self.gbm_n_estimators}")
+            print(f"  - learning_rate: {self.gbm_learning_rate}")
+            print(f"  - max_depth: {self.gbm_max_depth}")
+            print(f"  - subsample: {self.gbm_subsample}")
+            print(f"  - loss: huber (alpha=0.9)")
+            
+        elif self.model_type == "rf":
+            print(f"  - n_estimators: {self.rf_n_estimators}")
+            print(f"  - max_depth: {self.rf_max_depth}")
+            print(f"  - min_samples_split: {self.rf_min_samples_split}")
+            
+        elif self.model_type == "lgbm":
+            print(f"  - n_estimators: {self.lgbm_n_estimators}")
+            print(f"  - learning_rate: {self.lgbm_learning_rate}")
+            print(f"  - num_leaves: {self.lgbm_num_leaves}")
+            print(f"  - min_data_in_leaf: {self.lgbm_min_data_in_leaf}")
+            print(f"  - feature_fraction: {self.lgbm_feature_fraction}")
+            
+        elif self.model_type == "nn":
+            print(f"  - hidden_layers: {self.nn_hidden_layers}")
+            print(f"  - learning_rate: {self.nn_learning_rate}")
+            print(f"  - max_iter: {self.nn_max_iter}")
+            print(f"  - alpha (L2): {self.nn_alpha}")
+            print(f"  - early_stopping: {self.nn_early_stopping}")
+            
+        else:  # ridge
+            print(f"  - alpha (selected via CV): {self.best_alpha_}")
+            print(f"  - cv_splits: {self.cv_splits}")
+        
+        print(f"\nRandom state: {self.random_state}")
+        print("="*60 + "\n")
 
     def predict(self, X: pd.DataFrame, meta=None) -> pd.Series:
         """

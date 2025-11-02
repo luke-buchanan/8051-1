@@ -239,6 +239,10 @@ def run_mltester(
                     "mae": float(summary["mae"].mean()),
                     "rmse": float(summary["rmse"].mean())}
         summary = pd.concat([summary, pd.DataFrame([mean_row])], ignore_index=True)
+        
+        # Print the averages
+        print("-" * 50)
+        print(f"{'MEAN':>6}: DirAcc={mean_row['diracc']:0.4f}  MAE={mean_row['mae']:0.6f}  RMSE={mean_row['rmse']:0.6f}")
 
     summary.to_csv(outp / "mltester_summary.csv", index=False)
     print(f"Saved outputs to {outp.resolve()}")
